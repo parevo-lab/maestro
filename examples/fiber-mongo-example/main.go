@@ -8,68 +8,73 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/joho/godotenv"
+	"github.com/parevo-lab/maestro"
 	"github.com/parevo-lab/maestro/examples/fiber-mongo-example/handlers"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-var mongoClient *mongo.Client
-var db *mongo.Database
-
-func init() {
+func main() {
 	// Load .env file
 	if err := godotenv.Load(); err != nil {
 		log.Fatal("Error loading .env file")
 	}
 
-	// Connect to MongoDB
+	// MongoDB bağlantısı
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	clientOptions := options.Client().ApplyURI(os.Getenv("MONGODB_URI"))
-	client, err := mongo.Connect(ctx, clientOptions)
+	mongoURI := os.Getenv("MONGODB_URI")
+	if mongoURI == "" {
+		mongoURI = "mongodb://localhost:27017"
+	}
+
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer client.Disconnect(ctx)
 
-	// Ping the database
-	err = client.Ping(ctx, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// Maestro engine'i başlat
+	engine := maestro.NewEngine()
 
-	mongoClient = client
-	db = client.Database(os.Getenv("DB_NAME"))
-	handlers.SetDB(db)
-	log.Println("Connected to MongoDB!")
-}
+	// Hata gözlemcisi ekle
+	engine.AddObserver(func(event maestro.Event) {
+		if event.Type == maestro.EventStepFailed {
+			log.Printf("Workflow error at step %s: %v\n", event.StepID, event.Data)
+		}
+	})
 
-func main() {
+	// Fiber app oluşturma
 	app := fiber.New()
 
-	// Ana endpoint
-	app.Get("/", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"message": "Welcome to Maestro Fiber MongoDB Example",
-		})
-	})
+	// Collection
+	dbName := os.Getenv("DB_NAME")
+	if dbName == "" {
+		dbName = "workflow_db"
+	}
 
-	// Workflow routes
+	db := client.Database(dbName)
+	col := db.Collection("workflows")
+
+	// Handler oluşturma
+	h := handlers.NewHandler(col, engine)
+
+	// Routes
 	api := app.Group("/api")
-	workflows := api.Group("/workflows")
+	v1 := api.Group("/v1")
 
-	workflows.Post("/", handlers.CreateWorkflow)
-	workflows.Get("/", handlers.GetWorkflows)
-	workflows.Get("/:id", handlers.GetWorkflow)
-	workflows.Patch("/:id/status", handlers.UpdateWorkflowStatus)
+	workflows := v1.Group("/workflows")
+	workflows.Post("/", h.CreateWorkflow)
+	workflows.Get("/", h.ListWorkflows)
+	workflows.Get("/:id", h.GetWorkflow)
+	workflows.Put("/:id", h.UpdateWorkflowStatus)
 
-	// Health check endpoint
-	app.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"status":  "ok",
-			"mongodb": "connected",
-		})
-	})
+	// Server başlatma
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "3000"
+	}
 
-	log.Fatal(app.Listen(":3000"))
+	log.Fatal(app.Listen(":" + port))
 }
