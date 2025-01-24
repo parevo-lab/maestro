@@ -1,30 +1,29 @@
-# Maestro
+# 🎭 Maestro
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/parevo-lab/maestro.svg)](https://pkg.go.dev/github.com/parevo-lab/maestro)
 [![Go Report Card](https://goreportcard.com/badge/github.com/parevo-lab/maestro)](https://goreportcard.com/report/github.com/parevo-lab/maestro)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-Maestro is a powerful Go package for building and managing workflow orchestration systems. It provides a simple, flexible, and type-safe way to define, execute, and monitor workflows in Go applications.
+Maestro is a lightweight, high-performance workflow orchestration engine for Go applications. It provides a robust foundation for building complex, distributed workflows while maintaining simplicity and type safety.
 
-## Features
+## ✨ Key Features
 
-- 🎯 Type-safe workflow definitions
-- 🔄 Flexible workflow composition
-- 👥 Concurrent workflow execution
-- ✅ Built-in error handling and recovery
-- 📊 Workflow state management
-- 🔍 Progress tracking and monitoring
-- 🛡️ Context-aware execution
-- 🚀 High performance and low overhead
-- 📦 Zero external dependencies
+- 🔄 **Simple Workflow Definition**: Easy-to-use API for defining workflow steps and their dependencies
+- 🛡️ **Type Safety**: Full Go type system support for workflow data
+- 📊 **Event-Driven Architecture**: Built-in observer pattern for workflow monitoring
+- 🔒 **Thread Safety**: Concurrent execution with proper synchronization
+- 🎯 **Context Awareness**: Native support for Go context for timeout and cancellation
+- 📈 **Extensible**: Easy to add custom steps and observers
+- 🚀 **High Performance**: Minimal overhead and efficient execution
+- 🧪 **Testing Support**: Designed with testability in mind
 
-## Installation
+## 📦 Installation
 
 ```bash
 go get github.com/parevo-lab/maestro
 ```
 
-## Quick Start
+## 🚀 Quick Start
 
 ```go
 package main
@@ -35,161 +34,118 @@ import (
     "github.com/parevo-lab/maestro"
 )
 
+// Define your workflow data structures
+type Task struct {
+    Name        string
+    Description string
+    IsCompleted bool
+}
+
 func main() {
-    // Create a new workflow
-    flow := maestro.NewWorkflow("data-processing")
+    // Create a new workflow engine
+    engine := maestro.NewEngine()
 
-    // Define workflow steps
-    flow.AddStep("fetch-data", func(ctx context.Context, data interface{}) (interface{}, error) {
-        // Fetch data implementation
-        return []string{"data1", "data2"}, nil
+    // Add error handling observer
+    engine.AddObserver(func(event maestro.Event) {
+        if event.Type == maestro.EventStepFailed {
+            fmt.Printf("Workflow error at step %s: %v\n", event.StepID, event.Data)
+        }
     })
 
-    flow.AddStep("process-data", func(ctx context.Context, data interface{}) (interface{}, error) {
-        items := data.([]string)
-        // Process data implementation
-        return items, nil
+    // Register workflow steps
+    engine.RegisterStep("create-task", func(ctx context.Context, data interface{}) (interface{}, error) {
+        // Create a new task
+        task := &Task{
+            Name:        "Sample Task",
+            Description: "This is a sample task",
+            IsCompleted: false,
+        }
+        return task, nil
     })
 
-    // Execute workflow
-    result, err := flow.Execute(context.Background(), nil)
+    engine.RegisterStep("process-task", func(ctx context.Context, data interface{}) (interface{}, error) {
+        // Process the task
+        task := data.(*Task)
+        task.IsCompleted = true
+        return task, nil
+    })
+
+    // Execute workflow steps
+    ctx := context.Background()
+    
+    // Execute first step
+    result, err := engine.ExecuteStep(ctx, "create-task", nil)
     if err != nil {
-        fmt.Printf("Workflow failed: %v\n", err)
+        fmt.Printf("Error creating task: %v\n", err)
         return
     }
 
-    fmt.Printf("Workflow completed: %v\n", result)
-}
-```
-
-## Core Concepts
-
-### Workflow
-
-A workflow is a sequence of steps that are executed in a defined order. Each workflow has:
-
-- A unique identifier
-- A collection of steps
-- Input and output types
-- Execution context
-- Error handling mechanisms
-
-```go
-type Workflow struct {
-    ID      string
-    Steps   []Step
-    Context context.Context
-}
-```
-
-### Step
-
-A step is a single unit of work within a workflow:
-
-```go
-type Step struct {
-    ID       string
-    Handler  StepHandler
-    Options  StepOptions
-}
-
-type StepHandler func(ctx context.Context, input interface{}) (interface{}, error)
-```
-
-### Advanced Usage
-
-#### Parallel Execution
-
-```go
-func main() {
-    flow := maestro.NewWorkflow("parallel-processing")
-
-    // Add parallel steps
-    flow.AddParallelSteps(
-        maestro.Step{
-            ID: "step1",
-            Handler: func(ctx context.Context, data interface{}) (interface{}, error) {
-                return "result1", nil
-            },
-        },
-        maestro.Step{
-            ID: "step2",
-            Handler: func(ctx context.Context, data interface{}) (interface{}, error) {
-                return "result2", nil
-            },
-        },
-    )
-
-    results, err := flow.Execute(context.Background(), nil)
+    // Execute second step
+    result, err = engine.ExecuteStep(ctx, "process-task", result)
     if err != nil {
-        panic(err)
+        fmt.Printf("Error processing task: %v\n", err)
+        return
     }
 
-    fmt.Printf("Results: %v\n", results)
+    // Print final result
+    task := result.(*Task)
+    fmt.Printf("Task completed: %s - Completed: %v\n", task.Name, task.IsCompleted)
 }
 ```
 
-#### Error Handling and Retries
+## 📚 Core Concepts
+
+### WorkflowEngine
+
+The `WorkflowEngine` is the central component that manages workflow execution:
 
 ```go
-flow := maestro.NewWorkflow("error-handling")
-
-// Global error handler
-flow.OnError(func(err error) error {
-    return fmt.Errorf("workflow error: %w", err)
-})
-
-// Step with retry policy
-flow.AddStep("risky-operation", func(ctx context.Context, data interface{}) (interface{}, error) {
-    // Implementation with error handling
-    return nil, nil
-}).WithRetry(&maestro.RetryPolicy{
-    MaxAttempts: 3,
-    Delay: time.Second,
-    BackoffFactor: 2.0,
-})
+type WorkflowEngine struct {
+    steps     map[string]StepFunc
+    observers []ObserverFunc
+}
 ```
 
-#### State Management
+### Steps
+
+Steps are the building blocks of workflows:
 
 ```go
-flow := maestro.NewWorkflow("stateful-workflow")
-
-// Add state store
-flow.WithStateStore(maestro.NewInMemoryStore())
-
-// Access state in steps
-flow.AddStep("stateful-step", func(ctx context.Context, data interface{}) (interface{}, error) {
-    state := maestro.GetState(ctx)
-    state.Set("key", "value")
-    return state.Get("key"), nil
-})
+type StepFunc func(ctx context.Context, data interface{}) (interface{}, error)
 ```
 
-#### Conditional Workflows
+### Events
+
+The engine emits events during workflow execution:
 
 ```go
-flow := maestro.NewWorkflow("conditional-flow")
-
-flow.AddStep("check-condition", func(ctx context.Context, data interface{}) (interface{}, error) {
-    if someCondition {
-        return flow.ExecuteBranch("success-branch")
-    }
-    return flow.ExecuteBranch("failure-branch")
-})
-
-flow.AddBranch("success-branch", maestro.NewWorkflow("success-flow"))
-flow.AddBranch("failure-branch", maestro.NewWorkflow("failure-flow"))
+type Event struct {
+    Type      EventType
+    StepID    string
+    Data      interface{}
+    Timestamp time.Time
+}
 ```
 
-## Examples
+## 🎯 Use Cases
 
-For more examples, check out the [examples](examples) directory in the repository.
+- **Data Processing Pipelines**: Build complex data transformation workflows
+- **Business Process Automation**: Automate multi-step business processes
+- **Microservices Orchestration**: Coordinate multiple service calls
+- **Task Scheduling**: Create dependent task execution flows
+- **File Processing**: Handle multi-stage file processing workflows
 
-## Contributing
+## 📖 Examples
+
+Check out the [examples](./examples) directory for more detailed examples, including:
+- File sharing workflows
+- Data processing pipelines
+- Service orchestration patterns
+
+## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
 
-## License
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
