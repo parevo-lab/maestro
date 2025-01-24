@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"workflow/pkg/engine"
+	"github.com/parevo-lab/maestro"
 )
 
 func main() {
