@@ -1,5 +1,7 @@
 package main
 
+/**
+
 import (
 	"context"
 	"fmt"
@@ -11,10 +13,10 @@ import (
 
 func main() {
 	// Engine oluştur
-	wfEngine := engine.NewWorkflowEngine()
+	wfEngine := maestro.NewEngine()
 
 	// Observer ekle
-	wfEngine.AddObserver(func(event engine.Event) {
+	wfEngine.AddObserver(func(event maestro.Event) {
 		log.Printf("Event: %s, Step: %s, Data: %v\n", event.Type, event.StepID, event.Data)
 	})
 
@@ -38,22 +40,22 @@ func main() {
 	})
 
 	// İş akışı tanımı oluştur
-	workflow := engine.NewWorkflowDefinition(
+	workflow := maestro.NewWorkflowDefinition(
 		"order-flow",
 		"Sipariş İşleme",
 		"Yeni siparişleri işleme iş akışı",
 	)
 
 	// Adımları tanımla
-	validateStep := engine.NewStepDefinition("validate", "Validasyon", engine.StepTypeTask).
+	validateStep := maestro.NewStepDefinition("validate", "Validasyon", maestro.StepTypeTask).
 		WithTimeout(5 * time.Second).
 		WithNextSteps("process")
 
-	processStep := engine.NewStepDefinition("process", "İşleme", engine.StepTypeTask).
+	processStep := maestro.NewStepDefinition("process", "İşleme", maestro.StepTypeTask).
 		WithTimeout(10 * time.Second).
 		WithNextSteps("notify")
 
-	notifyStep := engine.NewStepDefinition("notify", "Bildirim", engine.StepTypeTask).
+	notifyStep := maestro.NewStepDefinition("notify", "Bildirim", maestro.StepTypeTask).
 		WithTimeout(5 * time.Second)
 
 	workflow.AddStep(validateStep)
@@ -61,7 +63,7 @@ func main() {
 	workflow.AddStep(notifyStep)
 
 	// Çalışma zamanı oluştur
-	runtime := engine.NewWorkflowRuntime(wfEngine, workflow)
+	runtime := maestro.NewWorkflowRuntime(wfEngine, workflow)
 
 	// İş akışını başlat
 	ctx := context.Background()
@@ -77,3 +79,6 @@ func main() {
 		fmt.Printf("Adım %s sonucu: %v\n", stepID, result)
 	}
 }
+
+
+**/

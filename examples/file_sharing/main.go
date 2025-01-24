@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/parevo-lab/maestro"
+	"github.com/parevo-lab/maestro/pkg/engine"
 )
 
 // FileShare represents a file sharing request
@@ -30,10 +30,17 @@ type User struct {
 
 func main() {
 	// Create a new workflow for file sharing
-	flow := maestro.NewWorkflow("file-sharing")
+	wfEngine := engine.NewWorkflowEngine()
 
-	// Step 1: Fetch files
-	flow.AddStep("fetch-files", func(ctx context.Context, data interface{}) (interface{}, error) {
+	// Add observer for error handling
+	wfEngine.AddObserver(func(event engine.Event) {
+		if event.Type == engine.EventStepFailed {
+			fmt.Printf("Workflow error at step %s: %v\n", event.StepID, event.Data)
+		}
+	})
+
+	// Register steps
+	wfEngine.RegisterStep("fetch-files", func(ctx context.Context, data interface{}) (interface{}, error) {
 		// Simulate fetching files from storage
 		files := []File{
 			{
@@ -54,7 +61,7 @@ func main() {
 	})
 
 	// Step 2: Fetch users
-	flow.AddStep("fetch-users", func(ctx context.Context, data interface{}) (interface{}, error) {
+	wfEngine.RegisterStep("fetch-users", func(ctx context.Context, data interface{}) (interface{}, error) {
 		fileShare := data.(*FileShare)
 
 		// Simulate fetching users from database
@@ -76,7 +83,7 @@ func main() {
 	})
 
 	// Step 3: Send notifications
-	flow.AddStep("send-notifications", func(ctx context.Context, data interface{}) (interface{}, error) {
+	wfEngine.RegisterStep("send-notifications", func(ctx context.Context, data interface{}) (interface{}, error) {
 		fileShare := data.(*FileShare)
 
 		// Simulate sending notifications
@@ -93,7 +100,7 @@ func main() {
 	})
 
 	// Step 4: Wait for approval
-	flow.AddStep("wait-for-approval", func(ctx context.Context, data interface{}) (interface{}, error) {
+	wfEngine.RegisterStep("wait-for-approval", func(ctx context.Context, data interface{}) (interface{}, error) {
 		fileShare := data.(*FileShare)
 
 		// Simulate waiting for approval with a timeout
@@ -127,16 +134,31 @@ func main() {
 		return fileShare, nil
 	})
 
-	// Add error handling
-	flow.OnError(func(err error) error {
-		fmt.Printf("Workflow error: %v\n", err)
-		return err
-	})
+	// Execute steps in sequence
+	var result interface{}
+	var err error
 
-	// Execute the workflow
-	result, err := flow.Execute(context.Background(), nil)
+	result, err = wfEngine.ExecuteStep(context.Background(), "fetch-files", nil)
 	if err != nil {
-		fmt.Printf("Workflow failed: %v\n", err)
+		fmt.Printf("Workflow failed at fetch-files: %v\n", err)
+		return
+	}
+
+	result, err = wfEngine.ExecuteStep(context.Background(), "fetch-users", result)
+	if err != nil {
+		fmt.Printf("Workflow failed at fetch-users: %v\n", err)
+		return
+	}
+
+	result, err = wfEngine.ExecuteStep(context.Background(), "send-notifications", result)
+	if err != nil {
+		fmt.Printf("Workflow failed at send-notifications: %v\n", err)
+		return
+	}
+
+	result, err = wfEngine.ExecuteStep(context.Background(), "wait-for-approval", result)
+	if err != nil {
+		fmt.Printf("Workflow failed at wait-for-approval: %v\n", err)
 		return
 	}
 
