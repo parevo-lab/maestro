@@ -1,152 +1,195 @@
-# Go Workflow Management
+# Maestro
 
-## About
+[![Go Reference](https://pkg.go.dev/badge/github.com/parevo-lab/maestro.svg)](https://pkg.go.dev/github.com/parevo-lab/maestro)
+[![Go Report Card](https://goreportcard.com/badge/github.com/parevo-lab/maestro)](https://goreportcard.com/report/github.com/parevo-lab/maestro)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-This project demonstrates a robust workflow management system implementation in Go. It provides a flexible and scalable solution for managing complex business processes through a RESTful API. The system supports various workflow types with customizable steps, including tasks, approvals, and automated processes.
+Maestro is a powerful Go package for building and managing workflow orchestration systems. It provides a simple, flexible, and type-safe way to define, execute, and monitor workflows in Go applications.
 
-### Key Features
-- 🔄 Dynamic workflow creation and management
-- 👥 User assignment and role-based operations
-- ✅ Multi-step approval processes
-- 📊 Data validation at each step
-- 🔍 Process tracking and monitoring
-- 📝 Detailed documentation with examples
-- 🔔 Real-time notifications via WebSocket
-- 💾 Persistent workflow state management
+## Features
 
-## API Endpoints
+- 🎯 Type-safe workflow definitions
+- 🔄 Flexible workflow composition
+- 👥 Concurrent workflow execution
+- ✅ Built-in error handling and recovery
+- 📊 Workflow state management
+- 🔍 Progress tracking and monitoring
+- 🛡️ Context-aware execution
+- 🚀 High performance and low overhead
+- 📦 Zero external dependencies
 
-### Workflow Management
-- `POST /workflows` - Create a new workflow
-- `GET /workflows/{id}` - Get workflow details by ID
-- `GET /workflows/user/{userId}` - Get all workflows assigned to a user
-- `POST /workflows/{id}/steps/{stepId}/process` - Process a workflow step
-
-### WebSocket Notifications
-- `GET /ws` - WebSocket connection endpoint for real-time notifications
-
-## Workflow Types
-- `task` - Basic task step
-- `approval` - Approval required step
-- `decision` - Decision making step
-- `process` - Automated process step
-
-## Result Types
-- `invoice` - Invoice generation result
-- `document` - Document generation result
-- `report` - Report generation result
-- `notification` - Notification result
-
-## Notification Types
-- `workflow` - Workflow related notifications
-- `task` - Task related notifications
-- `system` - System notifications
-
-## Example Usage
-
-### 1. Creating Order Workflow
+## Installation
 
 ```bash
-curl -X POST http://localhost:8080/workflows \
--H "Content-Type: application/json" \
--d '{
-  "name": "Order Process",
-  "type": "order_process",
-  "created_by": "65b012345678901234567890",
-  "steps": [
-    {
-      "id": "65b012345678901234567891",
-      "type": "task",
-      "title": "Order Details",
-      "assigned_to": "65b012345678901234567890",
-      "status": "pending",
-      "next_steps": ["65b012345678901234567892"]
-    },
-    {
-      "id": "65b012345678901234567892",
-      "type": "approval",
-      "title": "Stock Control",
-      "assigned_to": "65b012345678901234567893",
-      "status": "pending",
-      "next_steps": ["65b012345678901234567894"],
-      "required_data": ["order_items", "total_amount"]
-    },
-    {
-      "id": "65b012345678901234567894",
-      "type": "process",
-      "title": "Invoice Generation",
-      "assigned_to": "65b012345678901234567895",
-      "status": "pending",
-      "result_type": "invoice",
-      "required_data": ["order_items", "customer_info", "total_amount", "stock_approval"]
+go get github.com/parevo-lab/maestro
+```
+
+## Quick Start
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/parevo-lab/maestro"
+)
+
+func main() {
+    // Create a new workflow
+    flow := maestro.NewWorkflow("data-processing")
+
+    // Define workflow steps
+    flow.AddStep("fetch-data", func(ctx context.Context, data interface{}) (interface{}, error) {
+        // Fetch data implementation
+        return []string{"data1", "data2"}, nil
+    })
+
+    flow.AddStep("process-data", func(ctx context.Context, data interface{}) (interface{}, error) {
+        items := data.([]string)
+        // Process data implementation
+        return items, nil
+    })
+
+    // Execute workflow
+    result, err := flow.Execute(context.Background(), nil)
+    if err != nil {
+        fmt.Printf("Workflow failed: %v\n", err)
+        return
     }
-  ]
-}'
+
+    fmt.Printf("Workflow completed: %v\n", result)
+}
 ```
 
-### 2. Entering Order Details
+## Core Concepts
 
-```bash
-curl -X POST http://localhost:8080/workflows/WORKFLOW_ID/steps/65b012345678901234567891/process \
--H "Content-Type: application/json" \
--d '{
-  "action": "approve",
-  "data": {
-    "order_items": [
-      {
-        "product_id": "PROD001",
-        "name": "Laptop",
-        "quantity": 1,
-        "price": 15000
-      }
-    ],
-    "customer_info": {
-      "name": "John Smith",
-      "email": "john@example.com",
-      "tax_number": "1234567890"
-    },
-    "total_amount": 15000
-  }
-}'
+### Workflow
+
+A workflow is a sequence of steps that are executed in a defined order. Each workflow has:
+
+- A unique identifier
+- A collection of steps
+- Input and output types
+- Execution context
+- Error handling mechanisms
+
+```go
+type Workflow struct {
+    ID      string
+    Steps   []Step
+    Context context.Context
+}
 ```
 
-### 3. Stock Control
+### Step
 
-```bash
-curl -X POST http://localhost:8080/workflows/WORKFLOW_ID/steps/65b012345678901234567892/process \
--H "Content-Type: application/json" \
--d '{
-  "action": "approve",
-  "data": {
-    "stock_approval": true,
-    "stock_notes": "Stock is sufficient",
-    "approved_by": "Warehouse Manager"
-  }
-}'
+A step is a single unit of work within a workflow:
+
+```go
+type Step struct {
+    ID       string
+    Handler  StepHandler
+    Options  StepOptions
+}
+
+type StepHandler func(ctx context.Context, input interface{}) (interface{}, error)
 ```
 
-### 4. Invoice Generation
+### Advanced Usage
 
-```bash
-curl -X POST http://localhost:8080/workflows/WORKFLOW_ID/steps/65b012345678901234567894/process \
--H "Content-Type: application/json" \
--d '{
-  "action": "approve",
-  "data": {
-    "invoice_number": "INV-2024-001",
-    "invoice_date": "2024-01-24T15:00:00Z",
-    "items": [
-      {
-        "product_id": "PROD001",
-        "name": "Laptop",
-        "quantity": 1,
-        "unit_price": 15000,
-        "total": 15000
-      }
-    ],
-    "subtotal": 15000,
-    "tax": 2700,
-    "total": 17700
-  }
-}'
+#### Parallel Execution
+
+```go
+func main() {
+    flow := maestro.NewWorkflow("parallel-processing")
+
+    // Add parallel steps
+    flow.AddParallelSteps(
+        maestro.Step{
+            ID: "step1",
+            Handler: func(ctx context.Context, data interface{}) (interface{}, error) {
+                return "result1", nil
+            },
+        },
+        maestro.Step{
+            ID: "step2",
+            Handler: func(ctx context.Context, data interface{}) (interface{}, error) {
+                return "result2", nil
+            },
+        },
+    )
+
+    results, err := flow.Execute(context.Background(), nil)
+    if err != nil {
+        panic(err)
+    }
+
+    fmt.Printf("Results: %v\n", results)
+}
 ```
+
+#### Error Handling and Retries
+
+```go
+flow := maestro.NewWorkflow("error-handling")
+
+// Global error handler
+flow.OnError(func(err error) error {
+    return fmt.Errorf("workflow error: %w", err)
+})
+
+// Step with retry policy
+flow.AddStep("risky-operation", func(ctx context.Context, data interface{}) (interface{}, error) {
+    // Implementation with error handling
+    return nil, nil
+}).WithRetry(&maestro.RetryPolicy{
+    MaxAttempts: 3,
+    Delay: time.Second,
+    BackoffFactor: 2.0,
+})
+```
+
+#### State Management
+
+```go
+flow := maestro.NewWorkflow("stateful-workflow")
+
+// Add state store
+flow.WithStateStore(maestro.NewInMemoryStore())
+
+// Access state in steps
+flow.AddStep("stateful-step", func(ctx context.Context, data interface{}) (interface{}, error) {
+    state := maestro.GetState(ctx)
+    state.Set("key", "value")
+    return state.Get("key"), nil
+})
+```
+
+#### Conditional Workflows
+
+```go
+flow := maestro.NewWorkflow("conditional-flow")
+
+flow.AddStep("check-condition", func(ctx context.Context, data interface{}) (interface{}, error) {
+    if someCondition {
+        return flow.ExecuteBranch("success-branch")
+    }
+    return flow.ExecuteBranch("failure-branch")
+})
+
+flow.AddBranch("success-branch", maestro.NewWorkflow("success-flow"))
+flow.AddBranch("failure-branch", maestro.NewWorkflow("failure-flow"))
+```
+
+## Examples
+
+For more examples, check out the [examples](examples) directory in the repository.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
