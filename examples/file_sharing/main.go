@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/parevo-lab/maestro/pkg/engine"
+	"github.com/parevo-lab/maestro"
 )
 
 // FileShare represents a file sharing request
@@ -30,11 +30,11 @@ type User struct {
 
 func main() {
 	// Create a new workflow for file sharing
-	wfEngine := engine.NewWorkflowEngine()
+	wfEngine := maestro.NewEngine()
 
 	// Add observer for error handling
-	wfEngine.AddObserver(func(event engine.Event) {
-		if event.Type == engine.EventStepFailed {
+	wfEngine.AddObserver(func(event maestro.Event) {
+		if event.Type == maestro.EventStepFailed {
 			fmt.Printf("Workflow error at step %s: %v\n", event.StepID, event.Data)
 		}
 	})
